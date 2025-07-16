@@ -21,6 +21,8 @@ public class Questao : EntidadeBase<Questao>
     }
     public override void AtualizarRegistro(Questao registroEditado)
     {
-        
+        Materia = registroEditado.Materia;
+        Enunciado = registroEditado.Enunciado;
+        Alternativas = registroEditado.Alternativas;
     }
 }
