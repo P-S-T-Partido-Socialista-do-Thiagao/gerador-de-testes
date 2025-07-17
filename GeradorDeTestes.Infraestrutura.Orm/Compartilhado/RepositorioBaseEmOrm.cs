@@ -1,4 +1,4 @@
-﻿using ControleDeBar.Dominio.Compartilhado;
+﻿using GeradorDeTestes.Dominio.Compartilhado;
 using Microsoft.EntityFrameworkCore;
 
 namespace ControleDeBar.Infraestrutura.Orm.Compartilhado;
@@ -7,7 +7,7 @@ public class RepositorioBaseEmOrm<T> where T : EntidadeBase<T>
 {
     private readonly DbSet<T> registros;
 
-    public RepositorioBaseEmOrm(ControleDeBarDbContext contexto)
+    public RepositorioBaseEmOrm(GeradorDeTestesDbContext contexto)
     {
         this.registros = contexto.Set<T>();
     }
