@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Views\Materia\" />
     <Folder Include="wwwroot\" />
   </ItemGroup>
 
