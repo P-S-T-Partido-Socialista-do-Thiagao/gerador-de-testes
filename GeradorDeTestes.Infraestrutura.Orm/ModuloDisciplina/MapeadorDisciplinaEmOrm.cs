@@ -14,5 +14,9 @@ public class MapeadorDisciplinaEmOrm : IEntityTypeConfiguration<Disciplina>
         builder.Property(x => x.Nome)
             .HasMaxLength(20)
             .IsRequired();
+
+        builder.HasMany(x => x.Materias)
+            .WithOne(m => m.Disciplina)
+            .IsRequired();
     }
 }

@@ -5,11 +5,11 @@ namespace GeradorDeTestes.Dominio.ModuloDisciplina;
 public class Disciplina : EntidadeBase<Disciplina>
 {
     public string Nome { get; set; }
-    //public List<Materia> Materias { get; set; }
+    public List<Materia> Materias { get; set; }
 
     public Disciplina()
     {
-        //Materias = new List<Materia>();
+        Materias = new List<Materia>();
     }
 
     public Disciplina(string nome) : this() 
@@ -19,6 +19,6 @@ public class Disciplina : EntidadeBase<Disciplina>
     public override void AtualizarRegistro(Disciplina registroEditado)
     {
         Nome = registroEditado.Nome;
-        //Materias = registroEditado.Materias;
+        Materias = registroEditado.Materias;
     }
 }

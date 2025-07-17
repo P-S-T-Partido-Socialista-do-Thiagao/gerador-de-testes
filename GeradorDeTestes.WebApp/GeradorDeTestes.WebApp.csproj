@@ -16,7 +16,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\GeradorDeTestes.Dominio\GeradorDeTestes.Dominio.csproj" />
     <ProjectReference Include="..\GeradorDeTestes.Infraestrutura.Orm\GeradorDeTestes.Infraestrutura.Orm.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="wwwroot\" />
   </ItemGroup>
 
 </Project>
