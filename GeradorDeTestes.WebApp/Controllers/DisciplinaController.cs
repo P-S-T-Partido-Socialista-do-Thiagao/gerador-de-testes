@@ -1,4 +1,4 @@
-﻿using ControleDeBar.Infraestrutura.Orm.Compartilhado;
+﻿using GeradorDeTestes.Infraestrutura.Orm.Compartilhado;
 using GeradorDeTestes.Dominio.ModuloDisciplina;
 using Microsoft.AspNetCore.Mvc;
 
