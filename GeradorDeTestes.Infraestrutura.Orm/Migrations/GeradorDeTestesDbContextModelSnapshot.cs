@@ -40,19 +40,40 @@ namespace GeradorDeTestes.Infraestrutura.Orm.Migrations
             modelBuilder.Entity("GeradorDeTestes.Dominio.ModuloMateria.Materia", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DisciplinaId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Nome")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<int>("Serie")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("DisciplinaId");
+
                     b.ToTable("Materias");
+                });
+
+            modelBuilder.Entity("GeradorDeTestes.Dominio.ModuloMateria.Materia", b =>
+                {
+                    b.HasOne("GeradorDeTestes.Dominio.ModuloDisciplina.Disciplina", "Disciplina")
+                        .WithMany("Materias")
+                        .HasForeignKey("DisciplinaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Disciplina");
+                });
+
+            modelBuilder.Entity("GeradorDeTestes.Dominio.ModuloDisciplina.Disciplina", b =>
+                {
+                    b.Navigation("Materias");
                 });
 #pragma warning restore 612, 618
         }

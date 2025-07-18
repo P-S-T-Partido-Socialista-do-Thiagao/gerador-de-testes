@@ -18,5 +18,9 @@ public class MapeadorMateriaEmOrm : IEntityTypeConfiguration<Materia>
         builder.Property(x => x.Nome)
             .HasMaxLength(50)
             .IsRequired();
+
+        builder.HasOne(x => x.Disciplina)
+            .WithMany(d => d.Materias)
+            .IsRequired();
     }
 }
