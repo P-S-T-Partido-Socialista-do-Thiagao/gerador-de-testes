@@ -1,7 +1,7 @@
 ﻿using GeradorDeTestes.Dominio.Compartilhado;
 using Microsoft.EntityFrameworkCore;
 
-namespace ControleDeBar.Infraestrutura.Orm.Compartilhado;
+namespace GeradorDeTestes.Infraestrutura.Orm.Compartilhado;
 
 public class RepositorioBaseEmOrm<T> where T : EntidadeBase<T>
 {

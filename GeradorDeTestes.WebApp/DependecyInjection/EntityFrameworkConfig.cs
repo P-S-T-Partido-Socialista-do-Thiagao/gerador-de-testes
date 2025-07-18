@@ -1,5 +1,4 @@
-﻿
-using ControleDeBar.Infraestrutura.Orm.Compartilhado;
+﻿using GeradorDeTestes.Infraestrutura.Orm.Compartilhado;
 using Microsoft.EntityFrameworkCore;
 
 public static class EntityFrameworkConfig

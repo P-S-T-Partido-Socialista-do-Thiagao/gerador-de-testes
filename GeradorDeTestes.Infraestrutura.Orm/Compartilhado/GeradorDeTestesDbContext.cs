@@ -2,7 +2,7 @@
 using GeradorDeTestes.Dominio.ModuloMateria;
 using Microsoft.EntityFrameworkCore;
 
-namespace ControleDeBar.Infraestrutura.Orm.Compartilhado;
+namespace GeradorDeTestes.Infraestrutura.Orm.Compartilhado;
 
 public class GeradorDeTestesDbContext : DbContext
 {
