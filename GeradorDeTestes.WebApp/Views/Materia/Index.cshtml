@@ -1,5 +1,42 @@
-﻿@*
-    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-*@
+﻿@using GeradorDeTestes.WebApp.Models;
+@model VisualizarMateriasViewModel;
+
 @{
+    Layout = "_Layout";
+    ViewBag.Titulo = "Visualização de Contatos";
 }
+
+<p>
+    <a class="btn btn-primary px-4" href="/materias/cadastrar">
+        <i class="bi bi-plus"></i>
+        Cadastrar Novo
+    </a>
+</p>
+
+<hr />
+
+<div class="d-flex flex-wrap gap-2">
+    @foreach (var item in Model.Materias)
+    {
+        <div class="col-12 col-md-3">
+            <div class="card border-0">
+                <div class="card-body">
+                    <h5 class="card-title">Contato: @item.Nome</h5>
+                    <p class="card-text"><span class="fw-semibold">Disciplina:</span> @item.Disciplina</p>
+
+                    <span class="d-flex gap-1 justify-content-end mt-4">
+                        <a href="/materias/detalhes/@item.Id" class="btn btn-secondary rounded-circle opcao-card">
+                            <i class="bi bi-search"></i>
+                        </a>
+                        <a href="/materias/editar/@item.Id" class="btn btn-primary rounded-circle opcao-card">
+                            <i class="bi bi-pencil-square"></i>
+                        </a>
+                        <a href="/materias/excluir/@item.Id" class="btn btn-danger rounded-circle opcao-card">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                    </span>
+                </div>
+            </div>
+        </div>
+    }
+</div>

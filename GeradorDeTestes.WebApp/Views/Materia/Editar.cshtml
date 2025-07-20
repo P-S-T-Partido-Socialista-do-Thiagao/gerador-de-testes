@@ -1,5 +1,63 @@
-﻿@*
-    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-*@
+﻿@using GeradorDeTestes.WebApp.Models;
+@model EditarMateriaViewModel;
+
 @{
+    Layout = "_Layout";
+    ViewBag.Titulo = "Edição de Matéria";
+}
+
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+
+                    <form asp-action="Editar" asp-route-id="@Model.Id">
+                        <h3>Formulário de Edição</h3>
+
+                        @if (ViewData.ModelState["CadastroUnico"]?.Errors.Count > 0)
+                        {
+                            <div class="alert alert-danger alert-dismissible fade show my-3" action="alert">
+                                @ViewData.ModelState["CadastroUnico"]!.Errors.First().ErrorMessage
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        }
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label asp-for="Nome" class="form-label">Nome *</label>
+                                    <input asp-for="Nome" class="form-control" />
+                                    <span asp-validation-for="Nome" class="text-danger"></span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label asp-for="Disciplina" class="form-label">Disciplina *</label>
+                                    <input asp-for="Disciplina" class="form-control" />
+                                    <span asp-validation-for="Disciplina" class="text-danger"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Serie" class="form-label">Serie *</label>
+                            <input asp-for="Serie" class="form-control" />
+                            <span asp-validation-for="Serie" class="text-danger"></span>
+                        </div>
+
+                        <div class="mt-4 d-flex justify-content-end gap-2">
+                            <a href="/materias" class="btn btn-outline-secondary">Visualizar</a>
+                            <button type="submit" class="btn btn-primary">Editar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
 }
