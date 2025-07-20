@@ -1,0 +1,31 @@
+﻿@{
+    Layout = "_Layout";
+    ViewBag.Titulo = "Página Inicial";
+}
+
+<hr />
+<div class="d-flex flex-wrap gap-2 gap-lg-5">
+	<div class="col order-1 order-lg-0 py-lg-5">
+		<h2 class="text-primary fs-1 fw-bold">Seja bem-vindo/a!</h2>
+
+		<p class="fs-4 mt-3">
+			Nossa aplicação oferece a melhor experiência de geração de testes para seus alunos.
+		</p>
+
+		<p class="fs-4 mt-3">
+			Você pode cadastrar sua disciplina, organizar por matéria, criar questões e gerar provas para aplicar em sua turma!
+		</p>
+
+		<p class="fs-4 mt-4 text-secondary-emphasis">Clique em uma das opções abaixo para prosseguir:</p>
+
+		<div class="d-grid d-lg-flex flex-wrap gap-2">
+			<a href="/disciplinas" class="btn btn-outline-primary fw-semibold px-5 rounded-3">Contatos</a>
+			<a href="/materias" class="btn btn-outline-primary fw-semibold px-5 rounded-3">Compromissos</a>
+			<a href="/questoes" class="btn btn-outline-primary fw-semibold px-5 rounded-3">Categorias</a>
+			<a href="/testes" class="btn btn-outline-primary fw-semibold px-5 rounded-3">Despesas</a>
+		</div>
+	</div>
+	<div class="col-lg-4 order-0 order-lg-1">
+		<img src="..." alt="Professor" class="img-fluid" />
+	</div>
+</div>
