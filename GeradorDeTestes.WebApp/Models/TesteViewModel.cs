@@ -105,6 +105,10 @@ public class DetalhesTesteViewModel
         Id = id;
         Titulo = titulo;
         Disciplina = disciplina;
+        Materia = materia;
         Serie = serie;
+        Questoes = questoes;
+        QuantidadeQuestoes = quantidadeQuestoes;
+        Recuperacao = recuperacao;
     }
 }
