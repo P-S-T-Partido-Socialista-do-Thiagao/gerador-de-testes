@@ -9,7 +9,7 @@ public class Teste : EntidadeBase<Teste>
     public string Titulo { get; set; }
     public Disciplina Disciplina { get; set; }
     public Materia Materia { get; set; }
-    public SeriesEnum Serie { get; set; }
+    public ModuloMateria.EnumSerie Serie { get; set; }
     public List<Questao> Questoes { get; set; }
     public int QuantidadeQuestoes { get; set; }
     public bool Recuperacao { get; set; }
@@ -19,7 +19,7 @@ public class Teste : EntidadeBase<Teste>
         Questoes = new List<Questao>();
     }
 
-    public Teste(string titulo, Disciplina disciplina, Materia materia, SeriesEnum serie, 
+    public Teste(string titulo, Disciplina disciplina, Materia materia, EnumSerie serie, 
         List<Questao> questoes, bool recuperacao, int quantidadeQuestoes)
     {
         Titulo = titulo;

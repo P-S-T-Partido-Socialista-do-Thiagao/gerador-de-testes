@@ -1,4 +1,5 @@
 ﻿using GeradorDeTestes.Dominio.ModuloTeste;
+using GeradorDeTestes.Dominio.ModuloMateria;
 using GeradorDeTestes.Infraestrutura.Orm.Compartilhado;
 using GeradorDeTestes.WebApp.Extensions;
 using GeradorDeTestes.WebApp.Models;

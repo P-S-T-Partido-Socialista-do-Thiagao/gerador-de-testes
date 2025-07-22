@@ -11,7 +11,7 @@ public abstract class FormularioMateriaViewModel
     [Required(ErrorMessage = "O campo \"Nome\" é obrigatório.")]
     public string Nome { get; set; }
     public Disciplina Disciplina { get; set; }
-    public SeriesEnum Serie { get; set; }
+    public EnumSerie Serie { get; set; }
 }
     public class CadastrarMateriaViewModel : FormularioMateriaViewModel
     {
@@ -32,7 +32,7 @@ public abstract class FormularioMateriaViewModel
         public EditarMateriaViewModel()
         {
         }
-        public EditarMateriaViewModel(Guid id, string nome,  Disciplina disciplina, SeriesEnum serie)
+        public EditarMateriaViewModel(Guid id, string nome,  Disciplina disciplina, EnumSerie serie)
         {
             Id = id;
             Nome = nome;
@@ -46,7 +46,7 @@ public abstract class FormularioMateriaViewModel
         public Guid Id { get; set; }
         public string Nome { get; set; }
         public Disciplina Disciplina { get; set; }
-        public SeriesEnum Serie { get; set; }
+        public EnumSerie Serie { get; set; }
 
         public ExcluirMateriaViewModel() { }
         
@@ -79,9 +79,9 @@ public abstract class FormularioMateriaViewModel
         public Guid Id { get; set; }
         public string Nome { get; set; }
         public Disciplina Disciplina { get; set; }
-        public SeriesEnum Serie { get; set; }
+        public EnumSerie Serie { get; set; }
 
-        public DetalhesMateriaViewModel(Guid id, string nome, Disciplina disciplina, SeriesEnum serie)
+        public DetalhesMateriaViewModel(Guid id, string nome, Disciplina disciplina, EnumSerie serie)
         {
             Id = id;
             Nome = nome;

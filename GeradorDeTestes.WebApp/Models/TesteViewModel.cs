@@ -15,7 +15,7 @@ public abstract class FormularioTesteViewModel
     public string Titulo { get; set; }
     public Disciplina Disciplina { get; set; }
     public Materia Materia { get; set; }
-    public SeriesEnum Serie { get; set; }
+    public EnumSerie Serie { get; set; }
     public List<Questao> Questoes { get; set; }
     public int QuantidadeQuestoes { get; set; }
     public bool Recuperacao { get; set; }
@@ -39,7 +39,7 @@ public class EditarTesteViewModel : FormularioTesteViewModel
     public EditarTesteViewModel()
     {
     }
-    public EditarTesteViewModel(Guid id, string titulo, Disciplina disciplina, Materia materia, SeriesEnum serie, List<Questao> questoes, int quantidadeQuestoes, bool recuperacao)
+    public EditarTesteViewModel(Guid id, string titulo, Disciplina disciplina, Materia materia, EnumSerie serie, List<Questao> questoes, int quantidadeQuestoes, bool recuperacao)
     {
         Id = id;
         Titulo = titulo;
@@ -58,7 +58,7 @@ public class ExcluirTesteViewModel
     public string Titulo { get; set; }
     public Disciplina Disciplina { get; set; }
     public Materia Materia { get; set; }
-    public SeriesEnum Serie { get; set; }
+    public EnumSerie Serie { get; set; }
     public List<Questao> Questoes { get; set; }
     public int QuantidadeQuestoes { get; set; }
     public bool Recuperacao { get; set; }
@@ -95,12 +95,12 @@ public class DetalhesTesteViewModel
     public string Titulo { get; set; }
     public Disciplina Disciplina { get; set; }
     public Materia Materia { get; set; }
-    public SeriesEnum Serie { get; set; }
+    public EnumSerie Serie { get; set; }
     public List<Questao> Questoes { get; set; }
     public int QuantidadeQuestoes { get; set; }
     public bool Recuperacao { get; set; }
 
-    public DetalhesTesteViewModel(Guid id, string titulo, Disciplina disciplina, Materia materia, SeriesEnum serie, List<Questao> questoes, int quantidadeQuestoes, bool recuperacao)
+    public DetalhesTesteViewModel(Guid id, string titulo, Disciplina disciplina, Materia materia, EnumSerie serie, List<Questao> questoes, int quantidadeQuestoes, bool recuperacao)
     {
         Id = id;
         Titulo = titulo;
