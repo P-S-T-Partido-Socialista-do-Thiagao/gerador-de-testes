@@ -5,11 +5,13 @@ namespace GeradorDeTestes.Infraestrutura.Orm.Compartilhado;
 
 public class RepositorioBaseEmOrm<T> where T : EntidadeBase<T>
 {
-    private readonly DbSet<T> registros;
+    protected readonly DbSet<T> registros;
+    protected readonly GeradorDeTestesDbContext contexto;
 
     public RepositorioBaseEmOrm(GeradorDeTestesDbContext contexto)
     {
         this.registros = contexto.Set<T>();
+        this.contexto = contexto;
     }
 
     public void CadastrarRegistro(T novoRegistro)
