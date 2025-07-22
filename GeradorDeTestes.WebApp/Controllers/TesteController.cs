@@ -1,5 +1,6 @@
-﻿using GeradorDeTestes.Dominio.ModuloTeste;
+﻿using GeradorDeTestes.Dominio.Compartilhado;
 using GeradorDeTestes.Dominio.ModuloMateria;
+using GeradorDeTestes.Dominio.ModuloTeste;
 using GeradorDeTestes.Infraestrutura.Orm.Compartilhado;
 using GeradorDeTestes.WebApp.Extensions;
 using GeradorDeTestes.WebApp.Models;
@@ -11,11 +12,13 @@ namespace GeradorDeTestes.WebApp.Controllers;
     public class TesteController : Controller
     {
         private readonly GeradorDeTestesDbContext contexto;
+        private readonly IUnityOfWork unityOfWork;
         private readonly IRepositorioTeste repositorioTeste;
 
-        public TesteController(GeradorDeTestesDbContext contexto, IRepositorioTeste repositorioTeste)
+        public TesteController(GeradorDeTestesDbContext contexto, IRepositorioTeste repositorioTeste, IUnityOfWork unitOfWork)
         {
             this.contexto = contexto;
+            this.unityOfWork = unityOfWork;
             this.repositorioTeste = repositorioTeste;
         }
 

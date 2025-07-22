@@ -1,4 +1,5 @@
-﻿using GeradorDeTestes.Dominio.ModuloMateria;
+﻿using GeradorDeTestes.Dominio.Compartilhado;
+using GeradorDeTestes.Dominio.ModuloMateria;
 using GeradorDeTestes.Infraestrutura.Orm.Compartilhado;
 using GeradorDeTestes.WebApp.Extensions;
 using GeradorDeTestes.WebApp.Models;
@@ -10,11 +11,13 @@ namespace GeradorDeTestes.WebApp.Controllers
     public class MateriaController : Controller
     {
         private readonly GeradorDeTestesDbContext contexto;
+        private readonly IUnityOfWork unityOfWork;
         private readonly IRepositorioMateria repositorioMateria;
 
-        public MateriaController(GeradorDeTestesDbContext contexto, IRepositorioMateria repositorioMateria)
+        public MateriaController(GeradorDeTestesDbContext contexto, IRepositorioMateria repositorioMateria, IUnityOfWork unityOfWork)
         {
             this.contexto = contexto;
+            this.unityOfWork = unityOfWork;
             this.repositorioMateria = repositorioMateria;
         }
 
