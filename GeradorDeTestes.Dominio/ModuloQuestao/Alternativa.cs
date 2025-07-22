@@ -2,15 +2,14 @@
 public class Alternativa
 {
     public Guid Id { get; set; }
-    public char Letra { get; set; }
     public string Descricao { get; set; }
+    public Questao Questao { get; set; }
     public bool Correta { get; set; }
 
-    public Alternativa(string descricao, bool correta, char letra)
+    public Alternativa(string descricao, Questao questao)
     {
         Id = Guid.NewGuid();
         Descricao = descricao;
-        Correta = correta;
-        Letra = letra;
+        Questao = questao;
     }
 }
