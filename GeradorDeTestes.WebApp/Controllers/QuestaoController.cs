@@ -1,39 +1,39 @@
-﻿using GeradorDeTestes.Dominio.ModuloMateria;
+﻿using GeradorDeTestes.Dominio.Compartilhado;
+using GeradorDeTestes.Dominio.ModuloMateria;
 using GeradorDeTestes.Dominio.ModuloQuestao;
 using GeradorDeTestes.WebApp.Models;
-using GeradorDeTestes.WebApp.Extensions;
-using GeradorDeTestes.Infraestrutura.Orm.Compartilhado;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore.Storage;
 
 namespace GeradorDeTestes.WebApp.Controllers;
 
 [Route("questoes")]
 public class QuestaoController : Controller
 {
-    private readonly GeradorDeTestesDbContext contexto;
-    private readonly IRepositorioMateria repositorioMateria;
     private readonly IRepositorioQuestao repositorioQuestao;
+    private readonly IRepositorioMateria repositorioMateria;
+    private readonly IUnityOfWork unityOfWork;
+    private readonly ILogger<QuestaoController> logger;
 
-    public QuestaoController(GeradorDeTestesDbContext contexto, IRepositorioMateria repositorioMateria, IRepositorioQuestao repositorioQuestao)
+    public QuestaoController(
+        IRepositorioQuestao repositorioQuestao,
+        IRepositorioMateria repositorioMateria,
+        IUnityOfWork unityOfWork,
+        ILogger<QuestaoController> logger
+    )
     {
-        this.contexto = contexto;
-        this.repositorioMateria = repositorioMateria;
         this.repositorioQuestao = repositorioQuestao;
+        this.repositorioMateria = repositorioMateria;
+        this.unityOfWork = unityOfWork;
+        this.logger = logger;
     }
 
+    [HttpGet]
     public IActionResult Index()
     {
-        List<Questao> questoesNaoFinalizadas = repositorioQuestao.SelecionarNaoFinalizados();
+        var registros = repositorioQuestao.SelecionarRegistros();
 
-        repositorioQuestao.RemoverRegistros(questoesNaoFinalizadas);
-
-        List<Questao> questoes = repositorioQuestao.SelecionarRegistros()
-                                                   .Where(q => q.Finalizado)
-                                                   .ToList();
-
-        VisualizarQuestoesViewModel visualizarVM = new(questoes);
+        var visualizarVM = new VisualizarQuestoesViewModel(registros);
 
         return View(visualizarVM);
     }
@@ -41,301 +41,305 @@ public class QuestaoController : Controller
     [HttpGet("cadastrar")]
     public IActionResult Cadastrar()
     {
-        List<Materia> materias = repositorioMateria.SelecionarRegistros();
+        var materias = repositorioMateria.SelecionarRegistros();
 
-        CadastrarQuestaoViewModel cadastrarVM = new(materias);
+        var cadastrarVM = new CadastrarQuestaoViewModel(materias);
 
         return View(cadastrarVM);
     }
 
     [HttpPost("cadastrar")]
+    [ValidateAntiForgeryToken]
     public IActionResult Cadastrar(CadastrarQuestaoViewModel cadastrarVM)
     {
-        if (repositorioQuestao.SelecionarRegistros()
-            .Any(q => q.Enunciado == cadastrarVM.Enunciado && q.Materia.Id == cadastrarVM.MateriaId))
-            ModelState.AddModelError("ConflitoCadastro", "Já existe uma questão com este enunciado para a mesma matéria.");
+        var registros = repositorioQuestao.SelecionarRegistros();
 
-        if (!ModelState.IsValid)
+        var materias = repositorioMateria.SelecionarRegistros();
+
+        if (registros.Any(i => i.Enunciado.Equals(cadastrarVM.Enunciado)))
         {
-            cadastrarVM.Materias = repositorioMateria.SelecionarRegistros()
-                .Select(m => new SelectListItem { Text = m.Nome, Value = m.Id.ToString() })
+            ModelState.AddModelError(
+                "CadastroUnico",
+                "Já existe uma questão registrada com este enunciado."
+            );
+
+            cadastrarVM.MateriasDisponiveis = materias
+                .Select(d => new SelectListItem(d.Nome, d.Id.ToString()))
                 .ToList();
 
             return View(cadastrarVM);
         }
 
-        Materia materiaSelecionada = repositorioMateria.SelecionarRegistroPorId(cadastrarVM.MateriaId)!;
-
-        Questao novaQuestao = cadastrarVM.ParaEntidade(materiaSelecionada);
-
-        IDbContextTransaction transacao = contexto.Database.BeginTransaction();
-
         try
         {
-            repositorioQuestao.CadastrarRegistro(novaQuestao);
+            var entidade = CadastrarQuestaoViewModel.ParaEntidade(cadastrarVM, materias);
 
-            contexto.SaveChanges();
+            repositorioQuestao.CadastrarRegistro(entidade);
 
-            transacao.Commit();
+            unityOfWork.Commit();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            transacao.Rollback();
+            unityOfWork.RollBack();
 
-            throw;
+            logger.LogError(
+                ex,
+                "Ocorreu um erro durante o registro de {@ViewModel}.",
+                cadastrarVM
+            );
         }
 
-        return RedirectToAction(nameof(GerenciarAlternativas), new { id = novaQuestao.Id });
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost("cadastrar/adicionar-alternativa")]
+    public IActionResult AdicionarAlternativa(
+        CadastrarQuestaoViewModel cadastrarVm,
+        AdicionarAlternativaQuestaoViewModel alternativaVm
+    )
+    {
+        cadastrarVm.MateriasDisponiveis = repositorioMateria
+            .SelecionarRegistros()
+            .Select(d => new SelectListItem(d.Nome, d.Id.ToString()))
+            .ToList();
+
+        if (cadastrarVm.AlternativasSelecionadas.Any(a => a.Resposta.Equals(alternativaVm.Resposta)))
+        {
+            ModelState.AddModelError(
+                "CadastroUnico",
+                "Já existe uma alternativa registrada com esta resposta."
+            );
+
+            return View(nameof(Cadastrar), cadastrarVm);
+        }
+
+        if (alternativaVm.Correta && cadastrarVm.AlternativasSelecionadas.Any(a => a.Correta))
+        {
+            ModelState.AddModelError(
+                "CadastroUnico",
+                "Já existe uma alternativa registrada como correta."
+            );
+
+            return View(nameof(Cadastrar), cadastrarVm);
+        }
+
+        cadastrarVm.AdicionarAlternativa(alternativaVm);
+
+        return View(nameof(Cadastrar), cadastrarVm);
+    }
+
+    [HttpPost("cadastrar/remover-alternativa/{letra:alpha}")]
+    public IActionResult RemoverAlternativa(char letra, CadastrarQuestaoViewModel cadastrarVm)
+    {
+        var alternativa = cadastrarVm.AlternativasSelecionadas
+            .Find(a => a.Letra.Equals(letra));
+
+        if (alternativa is not null)
+            cadastrarVm.RemoverAlternativa(alternativa);
+
+        cadastrarVm.MateriasDisponiveis = repositorioMateria
+            .SelecionarRegistros()
+            .Select(d => new SelectListItem(d.Nome, d.Id.ToString()))
+            .ToList();
+
+        return View(nameof(Cadastrar), cadastrarVm);
     }
 
     [HttpGet("editar/{id:guid}")]
     public IActionResult Editar(Guid id)
     {
-        Questao questaoSelecionada = repositorioQuestao.SelecionarRegistroPorId(id)!;
+        var registro = repositorioQuestao.SelecionarRegistroPorId(id);
 
-        List<Materia> materias = repositorioMateria.SelecionarRegistros();
+        if (registro is null)
+            return RedirectToAction(nameof(Index));
 
-        EditarQuestaoViewModel editarVM = new(
-            questaoSelecionada,
-            materias);
+        var materias = repositorioMateria.SelecionarRegistros();
 
-        return View(editarVM);
+        var editarVm = new EditarQuestaoViewModel(
+            registro.Id,
+            registro.Enunciado,
+            registro.Materia.Id,
+            registro.Alternativas,
+            materias
+        );
+
+        return View(editarVm);
     }
 
     [HttpPost("editar/{id:guid}")]
-    public IActionResult Editar(Guid id, EditarQuestaoViewModel editarVM)
+    [ValidateAntiForgeryToken]
+    public IActionResult Editar(Guid id, EditarQuestaoViewModel editarVm)
     {
-        if (repositorioQuestao.SelecionarRegistros()
-            .Any(q => q.Enunciado == editarVM.Enunciado && q.Materia.Id == editarVM.MateriaId && q.Id != id))
-            ModelState.AddModelError("ConflitoEdicao", "Já existe uma questão com este enunciado para a mesma matéria.");
+        var registros = repositorioQuestao.SelecionarRegistros();
 
-        if (!ModelState.IsValid)
+        var materias = repositorioMateria.SelecionarRegistros();
+
+        if (registros.Any(i => !i.Id.Equals(id) && i.Enunciado.Equals(editarVm.Enunciado)))
         {
-            editarVM.Materias = repositorioMateria.SelecionarRegistros()
-                .Select(m => new SelectListItem { Text = m.Nome, Value = m.Id.ToString() })
+            ModelState.AddModelError(
+                "CadastroUnico",
+                "Já existe uma questão registrada com este enunciado."
+            );
+
+            editarVm.MateriasDisponiveis = materias
+                .Select(d => new SelectListItem(d.Nome, d.Id.ToString()))
                 .ToList();
 
-            return View(editarVM);
+            return View(editarVm);
         }
-
-        Materia materiaSelecionada = repositorioMateria.SelecionarRegistroPorId(editarVM.MateriaId)!;
-
-        Questao questaoEditada = editarVM.ParaEntidade(materiaSelecionada);
-
-        IDbContextTransaction transacao = contexto.Database.BeginTransaction();
 
         try
         {
-            repositorioQuestao.EditarRegistro(id, questaoEditada);
+            var entidadeEditada = EditarQuestaoViewModel.ParaEntidade(editarVm, materias);
 
-            contexto.SaveChanges();
+            repositorioQuestao.EditarRegistro(id, entidadeEditada);
 
-            transacao.Commit();
+            unityOfWork.Commit();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            transacao.Rollback();
+            unityOfWork.RollBack();
 
-            throw;
+            logger.LogError(
+                ex,
+                "Ocorreu um erro durante o registro de {@ViewModel}.",
+                editarVm
+            );
         }
 
         return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost("editar/{id:guid}/adicionar-alternativa")]
+    public IActionResult AdicionarAlternativa(
+       EditarQuestaoViewModel editarVm,
+       AdicionarAlternativaQuestaoViewModel alternativaVm
+   )
+    {
+        editarVm.MateriasDisponiveis = repositorioMateria
+            .SelecionarRegistros()
+            .Select(d => new SelectListItem(d.Nome, d.Id.ToString()))
+            .ToList();
+
+        if (editarVm.AlternativasSelecionadas.Any(a => a.Resposta.Equals(alternativaVm.Resposta)))
+        {
+            ModelState.AddModelError(
+                "CadastroUnico",
+                "Já existe uma alternativa registrada com esta resposta."
+            );
+
+            return View(nameof(Editar), editarVm);
+        }
+
+        if (alternativaVm.Correta && editarVm.AlternativasSelecionadas.Any(a => a.Correta))
+        {
+            ModelState.AddModelError(
+                "CadastroUnico",
+                "Já existe uma alternativa registrada como correta."
+            );
+
+            return View(nameof(Editar), editarVm);
+        }
+
+        editarVm.AdicionarAlternativa(alternativaVm);
+
+        var registro = repositorioQuestao.SelecionarRegistroPorId(editarVm.Id);
+
+        if (registro is null)
+            return RedirectToAction(nameof(Index));
+
+        registro.AdicionarAlternativa(alternativaVm.Resposta, alternativaVm.Correta);
+
+        unityOfWork.Commit();
+
+        return View(nameof(Editar), editarVm);
+    }
+
+    [HttpPost("editar/{id:guid}/remover-alternativa/{letra:alpha}")]
+    public IActionResult RemoverAlternativa(char letra, EditarQuestaoViewModel editarVm)
+    {
+        editarVm.MateriasDisponiveis = repositorioMateria
+            .SelecionarRegistros()
+            .Select(d => new SelectListItem(d.Nome, d.Id.ToString()))
+            .ToList();
+
+        var alternativa = editarVm.AlternativasSelecionadas
+            .Find(a => a.Letra.Equals(letra));
+
+        if (alternativa is not null)
+        {
+            var registro = repositorioQuestao.SelecionarRegistroPorId(editarVm.Id);
+
+            if (registro is null)
+                return RedirectToAction(nameof(Index));
+
+            editarVm.RemoverAlternativa(alternativa);
+
+            registro.RemoverAlternativa(letra);
+
+            unityOfWork.Commit();
+        }
+
+        return View(nameof(Editar), editarVm);
     }
 
     [HttpGet("excluir/{id:guid}")]
     public IActionResult Excluir(Guid id)
     {
-        Questao questaoSelecionada = repositorioQuestao.SelecionarRegistroPorId(id)!;
+        var registroSelecionado = repositorioQuestao.SelecionarRegistroPorId(id);
 
-        ExcluirQuestaoViewModel excluirVM = new(
-            id,
-            questaoSelecionada.Enunciado);
+        if (registroSelecionado is null)
+            return RedirectToAction(nameof(Index));
+
+        var excluirVM = new ExcluirQuestaoViewModel(
+            registroSelecionado.Id,
+            registroSelecionado.Enunciado
+        );
 
         return View(excluirVM);
     }
 
     [HttpPost("excluir/{id:guid}")]
+    [ValidateAntiForgeryToken]
     public IActionResult ExcluirConfirmado(Guid id)
     {
-        Questao questaoSelecionada = repositorioQuestao.SelecionarRegistroPorId(id)!;
-
-        if (contexto.Testes.Any(t => t.Questoes.Any(q => q.Id == id)))
-        {
-            ModelState.AddModelError("ConflitoExclusao", "Não é possível excluir a questão pois ela está vinculada a testes.");
-
-            ExcluirQuestaoViewModel excluirVM = new()
-            {
-                Id = questaoSelecionada.Id,
-                Enunciado = questaoSelecionada.Enunciado
-            };
-
-            return View("Excluir", excluirVM);
-        }
-
-        IDbContextTransaction transacao = contexto.Database.BeginTransaction();
-
         try
         {
             repositorioQuestao.ExcluirRegistro(id);
 
-            contexto.SaveChanges();
-
-            transacao.Commit();
+            unityOfWork.Commit();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            transacao.Rollback();
+            unityOfWork.RollBack();
 
-            throw;
+            logger.LogError(
+                ex,
+                "Ocorreu um erro durante a exclusão do registro {Id}.",
+                id
+            );
         }
-        return RedirectToAction("Index");
-    }
-
-    [HttpGet, Route("/questoes/{id:guid}/detalhes")]
-    public IActionResult Detalhes(Guid id)
-    {
-        Questao questaoSelecionada = repositorioQuestao.SelecionarRegistroPorId(id)!;
-
-        DetalhesQuestaoViewModel detalhesQuestaoVM = questaoSelecionada.ParaDetalhesVM();
-
-        return View(detalhesQuestaoVM);
-    }
-
-    [HttpGet, Route("/questoes/{id:guid}/alternativas")]
-    public IActionResult GerenciarAlternativas(Guid id)
-    {
-        Questao questaoSelecionada = repositorioQuestao.SelecionarRegistroPorId(id)!;
-
-        List<Alternativa> alternativas = questaoSelecionada.Alternativas.ToList();
-
-        GerenciarAlternativasViewModel gerenciarAlternativasVM = new(
-            questaoSelecionada,
-            alternativas);
-
-        if (alternativas.Count < 2 || alternativas.Count > 4)
-            ModelState.AddModelError("ConflitoAlternativas", "A questão deve ter entre 2 e 4 alternativas.");
-
-        if (alternativas.Count(a => a.Correta) != 1)
-            ModelState.AddModelError("ConflitoAlternativas", "A questão deve ter exatamente uma alternativa correta.");
-
-        if (!ModelState.IsValid)
-            return View(gerenciarAlternativasVM);
-
-        return View(gerenciarAlternativasVM);
-    }
-
-    [HttpPost, Route("/questoes/{id:guid}/adicionar-alternativa")]
-    public IActionResult AdicionarAlternativa(Guid id, AdicionarAlternativaViewModel adicionarAlternativaVM)
-    {
-        Questao questaoSelecionada = repositorioQuestao.SelecionarRegistroPorId(id)!;
-
-        if (string.IsNullOrWhiteSpace(adicionarAlternativaVM.TextoAlternativa))
-            ModelState.AddModelError("ConflitoAlternativas", "O texto da alternativa é obrigatório.");
-
-        if (questaoSelecionada.Alternativas.Count >= 4)
-            ModelState.AddModelError("ConflitoAlternativas", "A questão já possui o máximo de 4 alternativas.");
-
-        if (!ModelState.IsValid)
-        {
-            GerenciarAlternativasViewModel gerenciarAlternativasVM = new(
-                questaoSelecionada,
-                questaoSelecionada.Alternativas.ToList());
-
-            return View(nameof(GerenciarAlternativas), gerenciarAlternativasVM);
-        }
-
-        Alternativa novaAlternativa = new(
-            adicionarAlternativaVM.TextoAlternativa,
-            questaoSelecionada);
-
-        IDbContextTransaction transacao = contexto.Database.BeginTransaction();
-
-        try
-        {
-            questaoSelecionada.AderirAlternativa(novaAlternativa);
-
-            contexto.Alternativas.Add(novaAlternativa);
-
-            contexto.SaveChanges();
-
-            transacao.Commit();
-        }
-        catch (Exception)
-        {
-            transacao.Rollback();
-
-            throw;
-        }
-
-        return RedirectToAction(nameof(GerenciarAlternativas), new { id });
-    }
-
-    [HttpPost, Route("/questoes/{id:guid}/remover-alternativa/{idAlternativa:guid}")]
-    public IActionResult RemoverAlternativa(Guid id, Guid idAlternativa)
-    {
-        Questao questaoSelecionada = repositorioQuestao.SelecionarRegistroPorId(id)!;
-
-        Alternativa alternativaEscolhida = repositorioQuestao.SelecionarAlternativa(questaoSelecionada, idAlternativa)!;
-
-        IDbContextTransaction transacao = contexto.Database.BeginTransaction();
-
-        try
-        {
-            questaoSelecionada.RemoverAlternativa(alternativaEscolhida);
-
-            contexto.Alternativas.Remove(alternativaEscolhida);
-
-            contexto.SaveChanges();
-
-            transacao.Commit();
-        }
-        catch (Exception)
-        {
-            transacao.Rollback();
-
-            throw;
-        }
-
-        return RedirectToAction(nameof(GerenciarAlternativas), new { id });
-    }
-
-    [HttpPost("/questoes/{id:guid}/marcar-alternativa-correta")]
-    public IActionResult MarcarAlternativaCorreta(Guid id, Guid idAlternativaCorreta)
-    {
-        Questao questao = repositorioQuestao.SelecionarRegistroPorId(id)!;
-
-        foreach (Alternativa a in questao.Alternativas)
-            a.Correta = (a.Id == idAlternativaCorreta);
-
-        contexto.SaveChanges();
-
-        return RedirectToAction(nameof(GerenciarAlternativas), new { id });
-    }
-
-    [HttpPost, Route("/questoes/{id:guid}/finalizar")]
-    public IActionResult FinalizarQuestao(Guid id)
-    {
-        Questao questao = repositorioQuestao.SelecionarRegistroPorId(id)!;
-
-        if (questao.Alternativas.Count < 2 || questao.Alternativas.Count > 4)
-            ModelState.AddModelError("ConflitoAlternativas", "A questão deve ter entre 2 e 4 alternativas.");
-
-        if (questao.Alternativas.Count(a => a.Correta) != 1)
-            ModelState.AddModelError("ConflitoAlternativas", "A questão deve ter exatamente uma alternativa correta.");
-
-        if (!ModelState.IsValid)
-        {
-            GerenciarAlternativasViewModel gerenciarAlternativasVM = new(
-                questao,
-                questao.Alternativas.ToList());
-
-            return View("GerenciarAlternativas", gerenciarAlternativasVM);
-        }
-
-        questao.Finalizado = true;
-
-        contexto.SaveChanges();
 
         return RedirectToAction(nameof(Index));
+    }
+
+    [HttpGet("detalhes/{id:guid}")]
+    public IActionResult Detalhes(Guid id)
+    {
+        var registroSelecionado = repositorioQuestao.SelecionarRegistroPorId(id);
+
+        if (registroSelecionado is null)
+            return RedirectToAction(nameof(Index));
+
+        var detalhesVM = new DetalhesQuestaoViewModel(
+            id,
+            registroSelecionado.Enunciado,
+            registroSelecionado.Materia.Nome,
+            registroSelecionado.UtilizadaEmTeste ? "Sim" : "Não",
+            registroSelecionado.AlternativaCorreta?.Resposta ?? string.Empty,
+            registroSelecionado.Alternativas
+        );
+
+        return View(detalhesVM);
     }
 }

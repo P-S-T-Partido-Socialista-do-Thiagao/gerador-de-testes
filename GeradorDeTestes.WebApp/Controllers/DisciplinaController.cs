@@ -10,25 +10,29 @@ namespace GeradorDeTestes.WebApp.Controllers;
 [Route("disciplinas")]
 public class DisciplinaController : Controller
 {
-    private readonly GeradorDeTestesDbContext contexto;
-    private readonly IUnityOfWork unityOfWork;
     private readonly IRepositorioDisciplina repositorioDisciplina;
+    private readonly IUnityOfWork unityOfWork;
+    private readonly ILogger<DisciplinaController> logger;
 
-    public DisciplinaController(GeradorDeTestesDbContext contexto, IRepositorioDisciplina repositorioDisciplina, IUnityOfWork unityOfWork)
+    public DisciplinaController(
+        IRepositorioDisciplina repositorioDisciplina,
+        IUnityOfWork unityOfWork,
+        ILogger<DisciplinaController> logger
+    )
     {
-        this.contexto = contexto;
         this.unityOfWork = unityOfWork;
+        this.logger = logger;
         this.repositorioDisciplina = repositorioDisciplina;
     }
 
     [HttpGet]
     public IActionResult Index()
     {
-        var disciplinas = repositorioDisciplina.SelecionarRegistros();
+        var registros = repositorioDisciplina.SelecionarRegistros();
 
-        var visualizarVM = new VisualizarDisciplinasViewModel(disciplinas);
+        var visualizarVM = new VisualizarDisciplinasViewModel(registros);
 
-        return View(disciplinas);
+        return View(visualizarVM);
     }
 
     [HttpGet("cadastrar")]
@@ -45,35 +49,33 @@ public class DisciplinaController : Controller
     {
         var registros = repositorioDisciplina.SelecionarRegistros();
 
-        foreach (var item in registros)
+        if (registros.Any(i => i.Nome.Equals(cadastrarVM.Nome)))
         {
-            if (item.Nome.Equals(cadastrarVM.Nome))
-            {
-                ModelState.AddModelError("CadastroUnico", "Já existe uma disciplina cadastrada com esse nome.");
-                break;
-            }
-        }
+            ModelState.AddModelError(
+                "CadastroUnico",
+                "Já existe uma disciplina registrada com este nome."
+            );
 
-        if (!ModelState.IsValid)
             return View(cadastrarVM);
-
-        var entidade = cadastrarVM.ParaEntidade();
-
-        var transacao = contexto.Database.BeginTransaction();
+        }
 
         try
         {
+            var entidade = FormularioDisciplinaViewModel.ParaEntidade(cadastrarVM);
+
             repositorioDisciplina.CadastrarRegistro(entidade);
 
-            contexto.SaveChanges();
-            transacao.Commit();
-
+            unityOfWork.Commit();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            transacao.Rollback();
+            unityOfWork.RollBack();
 
-            throw;
+            logger.LogError(
+                ex,
+                "Ocorreu um erro durante o registro de {@ViewModel}.",
+                cadastrarVM
+            );
         }
 
         return RedirectToAction(nameof(Index));
@@ -84,10 +86,12 @@ public class DisciplinaController : Controller
     {
         var registroSelecionado = repositorioDisciplina.SelecionarRegistroPorId(id);
 
+        if (registroSelecionado is null)
+            return RedirectToAction(nameof(Index));
+
         var editarVM = new EditarDisciplinaViewModel(
             id,
-            registroSelecionado.Nome,
-            registroSelecionado.Materias
+            registroSelecionado.Nome
         );
 
         return View(editarVM);
@@ -99,77 +103,86 @@ public class DisciplinaController : Controller
     {
         var registros = repositorioDisciplina.SelecionarRegistros();
 
-        foreach (var item in registros)
+        if (registros.Any(i => !i.Id.Equals(editarVM.Id) && i.Nome.Equals(editarVM.Nome)))
         {
-            if (!item.Id.Equals(id) && item.Nome.Equals(editarVM.Nome))
-            {
-                ModelState.AddModelError("CadastroUnico", "Já existe uma disciplina registrada com este nome.");
-                break;
-            }
-        }
+            ModelState.AddModelError(
+                "CadastroUnico",
+                "Já existe uma disciplina registrada com este nome."
+            );
 
-        if (!ModelState.IsValid)
             return View(editarVM);
-
-        var entidadeEditada = editarVM.ParaEntidade();
-
-        var transacao = contexto.Database.BeginTransaction();
+        }
 
         try
         {
+            var entidadeEditada = FormularioDisciplinaViewModel.ParaEntidade(editarVM);
+
             repositorioDisciplina.EditarRegistro(id, entidadeEditada);
 
-            contexto.SaveChanges();
-            transacao.Commit();
+            unityOfWork.Commit();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            transacao.Rollback();
+            unityOfWork.RollBack();
 
-            throw;
+            logger.LogError(
+                ex,
+                "Ocorreu um erro durante a edição do registro {@ViewModel}.",
+                editarVM
+            );
         }
 
         return RedirectToAction(nameof(Index));
     }
 
-
     [HttpGet("excluir/{id:guid}")]
-    public ActionResult Excluir(Guid id)
+    public IActionResult Excluir(Guid id)
     {
         var registroSelecionado = repositorioDisciplina.SelecionarRegistroPorId(id);
 
-        var excluirVM = new ExcluirDisciplinaViewModel(registroSelecionado.Id, registroSelecionado.Nome, registroSelecionado.Materias);
+        if (registroSelecionado is null)
+            return RedirectToAction(nameof(Index));
+
+        var excluirVM = new ExcluirDisciplinaViewModel(
+            registroSelecionado.Id,
+            registroSelecionado.Nome
+        );
 
         return View(excluirVM);
     }
 
     [HttpPost("excluir/{id:guid}")]
-    public ActionResult ExcluirConfirmado(Guid id)
+    [ValidateAntiForgeryToken]
+    public IActionResult ExcluirConfirmado(Guid id)
     {
-        var transacao = contexto.Database.BeginTransaction();
-
         try
         {
             repositorioDisciplina.ExcluirRegistro(id);
 
-            contexto.SaveChanges();
-
-            transacao.Commit();
+            unityOfWork.Commit();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            transacao.Rollback();
+            unityOfWork.RollBack();
 
-            throw;
+            logger.LogError(
+                ex,
+                "Ocorreu um erro durante a exclusão do registro {Id}.",
+                id
+            );
         }
 
         return RedirectToAction(nameof(Index));
     }
 
+
     [HttpGet("detalhes/{id:guid}")]
-    public ActionResult Detalhes(Guid id)
+    public IActionResult Detalhes(Guid id)
     {
         var registroSelecionado = repositorioDisciplina.SelecionarRegistroPorId(id);
+
+        if (registroSelecionado is null)
+            return RedirectToAction(nameof(Index));
 
         var detalhesVM = new DetalhesDisciplinaViewModel(
             id,

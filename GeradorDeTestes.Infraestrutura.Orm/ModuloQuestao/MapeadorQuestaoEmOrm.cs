@@ -16,14 +16,14 @@ public class MapeadorQuestaoEmOrm : IEntityTypeConfiguration<Questao>
             .HasMaxLength(500)
             .IsRequired();
 
-        //builder.Property(q => q.UtilizadaEmTeste)
-        //    .IsRequired();
+        builder.Property(q => q.UtilizadaEmTeste)
+            .IsRequired();
 
-        //builder.HasOne(q => q.Materia)
-        //    .WithMany(m => m.Questoes)
-        //    .IsRequired();
+        builder.HasOne(q => q.Materia)
+            .WithMany(m => m.Questoes)
+            .IsRequired();
 
-        //builder.HasMany(q => q.Alternativas)
-        //    .WithOne(a => a.Questao);
+        builder.HasMany(q => q.Alternativas)
+            .WithOne(a => a.Questao);
     }
 }

@@ -1,153 +1,156 @@
 ﻿using GeradorDeTestes.Dominio.Compartilhado;
+using GeradorDeTestes.Dominio.ModuloDisciplina;
 using GeradorDeTestes.Dominio.ModuloMateria;
+using GeradorDeTestes.Dominio.ModuloQuestao;
 using GeradorDeTestes.Dominio.ModuloTeste;
 using GeradorDeTestes.Infraestrutura.Orm.Compartilhado;
 using GeradorDeTestes.WebApp.Extensions;
 using GeradorDeTestes.WebApp.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using System.Text.Json;
 
 namespace GeradorDeTestes.WebApp.Controllers;
 
-    [Route("testes")]
-    public class TesteController : Controller
+[Route("testes")]
+public class TesteController : Controller
+{
+    private readonly IRepositorioTeste repositorioTeste;
+    private readonly IRepositorioQuestao repositorioQuestao;
+    private readonly IRepositorioDisciplina repositorioDisciplina;
+    private readonly IRepositorioMateria repositorioMateria;
+    private readonly IUnityOfWork unityOfWork;
+    private readonly ILogger<TesteController> logger;
+
+    public TesteController(
+        IRepositorioTeste repositorioTeste,
+        IRepositorioQuestao repositorioQuestao,
+        IRepositorioDisciplina repositorioDisciplina,
+        IRepositorioMateria repositorioMateria,
+        IUnityOfWork unityOfWork,
+        ILogger<TesteController> logger
+    )
     {
-        private readonly GeradorDeTestesDbContext contexto;
-        private readonly IUnityOfWork unityOfWork;
-        private readonly IRepositorioTeste repositorioTeste;
+        this.repositorioTeste = repositorioTeste;
+        this.repositorioQuestao = repositorioQuestao;
+        this.repositorioDisciplina = repositorioDisciplina;
+        this.repositorioMateria = repositorioMateria;
+        this.unityOfWork = unityOfWork;
+        this.logger = logger;
+    }
 
-        public TesteController(GeradorDeTestesDbContext contexto, IRepositorioTeste repositorioTeste, IUnityOfWork unitOfWork)
+    [HttpGet]
+    public IActionResult Index()
+    {
+        var registros = repositorioTeste.SelecionarRegistros();
+
+        var visualizarVm = new VisualizarTestesViewModel(registros);
+
+        return View(visualizarVm);
+    }
+
+    [HttpGet("gerar/primeira-etapa")]
+    public IActionResult PrimeiraEtapaGerar()
+    {
+        var disciplinas = repositorioDisciplina.SelecionarRegistros();
+
+        var primeiraEtapaVm = new PrimeiraEtapaGerarTesteViewModel
         {
-            this.contexto = contexto;
-            this.unityOfWork = unityOfWork;
-            this.repositorioTeste = repositorioTeste;
-        }
+            DisciplinasDisponiveis = disciplinas
+                .Select(d => new SelectListItem(d.Nome, d.Id.ToString()))
+                .ToList()
+        };
 
-        public IActionResult Index()
-        {
-            var registros = repositorioTeste.SelecionarRegistros();
+        return View(primeiraEtapaVm);
+    }
 
-            var visualizarVM = new VisualizarTesteViewModel(registros);
+    [HttpPost("gerar/primeira-etapa")]
+    public IActionResult PrimeiraEtapaGerar(PrimeiraEtapaGerarTesteViewModel primeiraEtapaVm)
+    {
+        var disciplinaSelecionada = repositorioDisciplina.SelecionarRegistroPorId(primeiraEtapaVm.DisciplinaId);
 
-            return View(registros);
-        }
-
-        [HttpGet("cadastrar")]
-        public IActionResult Cadastrar()
-        {
-            var cadastrarVM = new CadastrarTesteViewModel();
-
-            return View(cadastrarVM);
-        }
-
-        [HttpPost("cadastrar")]
-        [ValidateAntiForgeryToken]
-        public IActionResult Cadastrar(CadastrarTesteViewModel cadastrarVM)
-        {
-            var registros = repositorioTeste.SelecionarRegistros();
-
-            foreach (var item in registros)
-            {
-                if (item.Titulo.Equals(cadastrarVM.Titulo))
-                {
-                    ModelState.AddModelError("CadastroUnico", "Já existe um registro com este titulo.");
-                    break;
-                }
-            }
-
-            if (!ModelState.IsValid)
-                return View(cadastrarVM);
-
-            var entidade = cadastrarVM.ParaEntidade();
-
-            repositorioTeste.CadastrarRegistro(entidade);
-
-            contexto.SaveChanges();
-
+        if (disciplinaSelecionada is null)
             return RedirectToAction(nameof(Index));
-        }
 
-        [HttpGet("editar/{id:guid}")]
-        public ActionResult Editar(Guid id)
-        {
-            var registroSelecionado = repositorioTeste.SelecionarRegistroPorId(id);
+        var materias = repositorioMateria
+            .SelecionarRegistros()
+            .Where(m => m.Disciplina.Equals(disciplinaSelecionada))
+            .Where(m => m.Serie.Equals(primeiraEtapaVm.Serie))
+            .ToList();
 
-            var editarVM = new EditarTesteViewModel(
-                    id,
-                    registroSelecionado.Titulo,
-                    registroSelecionado.Disciplina,
-                    registroSelecionado.Materia,
-                    registroSelecionado.Serie,
-                    registroSelecionado.Questoes,
-                    registroSelecionado.QuantidadeQuestoes,
-                    registroSelecionado.Recuperacao
-                );
+        var segundaEtapaVm = PrimeiraEtapaGerarTesteViewModel.AvancarEtapa(
+            primeiraEtapaVm,
+            disciplinaSelecionada,
+            materias
+        );
 
-            return View(editarVM);
-        }
+        var jsonString = JsonSerializer.Serialize(segundaEtapaVm);
 
-        [HttpPost("editar/{id:guid}")]
-        [ValidateAntiForgeryToken]
-        public ActionResult Editar(Guid id, EditarTesteViewModel editarVM)
-        {
-            var registros = repositorioTeste.SelecionarRegistros();
+        TempData.Add(nameof(SegundaEtapaGerarTesteViewModel), jsonString);
 
-            foreach (var item in registros)
-            {
-                if (!item.Id.Equals(id) && item.Titulo.Equals(editarVM.Titulo))
-                {
-                    ModelState.AddModelError("CadastroUnico", "Já existe um teste com esse título");
-                    break;
-                }
-            }
+        return RedirectToAction(nameof(SegundaEtapaGerar));
+    }
 
-            if (!ModelState.IsValid)
-                return View(editarVM);
+    [HttpGet("gerar/segunda-etapa")]
+    public IActionResult SegundaEtapaGerar()
+    {
+        var conseguiuRecuperar = TempData
+            .TryGetValue(nameof(SegundaEtapaGerarTesteViewModel), out var value);
 
-            var entidadeEditada = editarVM.ParaEntidade();
-
-            repositorioTeste.EditarRegistro(id, entidadeEditada);
-
-            contexto.SaveChanges();
-
+        if (!conseguiuRecuperar || value is not string jsonString)
             return RedirectToAction(nameof(Index));
-        }
 
-        [HttpGet("excluir/{id:guid}")]
-        public IActionResult Excluir(Guid id)
+        var segundaEtapaVm = JsonSerializer.Deserialize<SegundaEtapaGerarTesteViewModel>(jsonString);
+
+        return View(segundaEtapaVm);
+    }
+
+    [HttpPost("gerar/segunda-etapa/sortear-questoes")]
+    public IActionResult SortearQuestoes(SegundaEtapaGerarTesteViewModel segundaEtapaVm)
+    {
+        List<Questao> questoesSorteadas;
+
+        if (segundaEtapaVm.Recuperacao)
         {
-            var registroSelecionado = repositorioTeste.SelecionarRegistroPorId(id);
-
-            var excluirVM = new ExcluirMateriaViewModel(registroSelecionado.Id, registroSelecionado.Titulo);
-
-            return View(excluirVM);
+            questoesSorteadas = repositorioQuestao.SelecionarQuestoesPorDisciplinaESerie(
+                segundaEtapaVm.DisciplinaId,
+                segundaEtapaVm.Serie,
+                segundaEtapaVm.QuantidadeQuestoes
+            );
         }
-
-        [HttpPost("excluir/{id:guid}")]
-        public IActionResult ExcluirConfirmado(Guid id)
+        else
         {
-            repositorioTeste.ExcluirRegistro(id);
+            if (!segundaEtapaVm.MateriaId.HasValue)
+                throw new InvalidOperationException("Não foi possível obter o ID da matéria selecionada.");
 
-            contexto.SaveChanges();
-
-            return RedirectToAction(nameof(Index));
-        }
-
-        [HttpGet("detalhes/{id:guid}")]
-        public IActionResult Detalhes(Guid id)
-        {
-            var registroSelecionado = repositorioTeste.SelecionarRegistroPorId(id);
-
-            var detalhesVM = new DetalhesTesteViewModel(
-                id,
-                registroSelecionado.Titulo,
-                registroSelecionado.Disciplina,
-                registroSelecionado.Materia,
-                registroSelecionado.Serie,
-                registroSelecionado.Questoes,
-                registroSelecionado.QuantidadeQuestoes,
-                registroSelecionado.Recuperacao
+            questoesSorteadas = repositorioQuestao.SelecionarQuestoesPorMateria(
+                segundaEtapaVm.MateriaId.Value,
+                segundaEtapaVm.QuantidadeQuestoes
             );
 
-            return View(detalhesVM);
+            segundaEtapaVm.MateriasDisponiveis = repositorioMateria
+                .SelecionarRegistros()
+                .Where(m => m.Disciplina.Id.Equals(segundaEtapaVm.DisciplinaId))
+                .Where(m => m.Serie.Equals(segundaEtapaVm.Serie))
+                .Select(m => new SelectListItem(m.Nome, m.Id.ToString()))
+                .ToList();
         }
+
+        segundaEtapaVm.QuestoesSorteadas = questoesSorteadas.Select(q => new DetalhesQuestaoViewModel(
+            q.Id,
+            q.Enunciado,
+            q.Materia.Nome,
+            q.UtilizadaEmTeste ? "Sim" : "Não",
+            q.AlternativaCorreta?.Resposta ?? string.Empty,
+            q.Alternativas
+        )).ToList();
+
+        return View(nameof(SegundaEtapaGerar), segundaEtapaVm);
     }
+
+    [HttpPost("gerar/confirmar")]
+    public IActionResult ConfirmarGeracao(SegundaEtapaGerarTesteViewModel segundaEtapaVm)
+    {
+        return View();
+    }
+}

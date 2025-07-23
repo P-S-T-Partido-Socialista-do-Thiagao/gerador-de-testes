@@ -5,11 +5,12 @@ namespace GeradorDeTestes.WebApp.Extensions;
 
 public static class EnumExtensions
 {
-    public static string GetDisplayName<TEnum>(this TEnum enumValue) where TEnum : Enum
+    public static string? GetDisplayName(this Enum enumValue)
     {
-        MemberInfo? memberInfo = typeof(TEnum).GetMember(enumValue.ToString()).FirstOrDefault();
-        DisplayAttribute? atributoDisplay = memberInfo?.GetCustomAttribute<DisplayAttribute>();
-
-        return atributoDisplay?.Name ?? enumValue.ToString();
+        return enumValue.GetType()
+                        .GetMember(enumValue.ToString())
+                        .First()
+                        .GetCustomAttribute<DisplayAttribute>()?
+                        .GetName();
     }
 }

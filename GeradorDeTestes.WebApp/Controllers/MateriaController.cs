@@ -1,145 +1,219 @@
 ﻿using GeradorDeTestes.Dominio.Compartilhado;
+using GeradorDeTestes.Dominio.ModuloDisciplina;
 using GeradorDeTestes.Dominio.ModuloMateria;
 using GeradorDeTestes.Infraestrutura.Orm.Compartilhado;
 using GeradorDeTestes.WebApp.Extensions;
 using GeradorDeTestes.WebApp.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
-namespace GeradorDeTestes.WebApp.Controllers
+namespace GeradorDeTestes.WebApp.Controllers;
+[Route("materias")]
+public class MateriaController : Controller
 {
-    [Route("materias")]
-    public class MateriaController : Controller
+    private readonly IRepositorioMateria repositorioMateria;
+    private readonly IRepositorioDisciplina repositorioDisciplina;
+    private readonly IUnityOfWork unityOfWork;
+    private readonly ILogger<MateriaController> logger;
+
+    public MateriaController(
+        IRepositorioMateria repositorioMateria,
+        IRepositorioDisciplina repositorioDisciplina,
+        IUnityOfWork unityOfWork,
+        ILogger<MateriaController> logger
+    )
     {
-        private readonly GeradorDeTestesDbContext contexto;
-        private readonly IUnityOfWork unityOfWork;
-        private readonly IRepositorioMateria repositorioMateria;
+        this.repositorioMateria = repositorioMateria;
+        this.repositorioDisciplina = repositorioDisciplina;
+        this.unityOfWork = unityOfWork;
+        this.logger = logger;
+    }
 
-        public MateriaController(GeradorDeTestesDbContext contexto, IRepositorioMateria repositorioMateria, IUnityOfWork unityOfWork)
+    [HttpGet]
+    public IActionResult Index()
+    {
+        var registros = repositorioMateria.SelecionarRegistros();
+
+        var visualizarVM = new VisualizarMateriasViewModel(registros);
+
+        return View(visualizarVM);
+    }
+
+    [HttpGet("cadastrar")]
+    public IActionResult Cadastrar()
+    {
+        var disciplinas = repositorioDisciplina.SelecionarRegistros();
+
+        var cadastrarVM = new CadastrarMateriaViewModel(disciplinas);
+
+        return View(cadastrarVM);
+    }
+
+    [HttpPost("cadastrar")]
+    [ValidateAntiForgeryToken]
+    public IActionResult Cadastrar(CadastrarMateriaViewModel cadastrarVM)
+    {
+        var registros = repositorioMateria.SelecionarRegistros();
+
+        var disciplinas = repositorioDisciplina.SelecionarRegistros();
+
+        if (registros.Any(i => i.Nome.Equals(cadastrarVM.Nome)))
         {
-            this.contexto = contexto;
-            this.unityOfWork = unityOfWork;
-            this.repositorioMateria = repositorioMateria;
-        }
+            ModelState.AddModelError(
+                "CadastroUnico",
+                "Já existe uma disciplina registrada com este nome."
+            );
 
-        public IActionResult Index()
-        {
-            var registros = repositorioMateria.SelecionarRegistros();
-
-            var visualizarVM = new VisualizarMateriasViewModel(registros);
-
-            return View(registros);
-        }
-
-        [HttpGet("cadastrar")]
-        public IActionResult Cadastrar()
-        {
-            var cadastrarVM = new CadastrarMateriaViewModel();
+            cadastrarVM.DisciplinasDisponiveis = disciplinas
+                .Select(d => new SelectListItem(d.Nome, d.Id.ToString()))
+                .ToList();
 
             return View(cadastrarVM);
         }
 
-        [HttpPost("cadastrar")]
-        [ValidateAntiForgeryToken]
-        public IActionResult Cadastrar(CadastrarMateriaViewModel cadastrarVM)
+        try
         {
-            var registros = repositorioMateria.SelecionarRegistros();
-
-            foreach (var item in registros)
-            {
-                if (item.Nome.Equals(cadastrarVM.Nome))
-                {
-                    ModelState.AddModelError("CadastroUnico", "Já existe um registro com este nome.");
-                    break;
-                }
-            }
-
-            if (!ModelState.IsValid)
-                return View(cadastrarVM);
-
-            var entidade = cadastrarVM.ParaEntidade();
+            var entidade = FormularioMateriaViewModel.ParaEntidade(cadastrarVM, disciplinas);
 
             repositorioMateria.CadastrarRegistro(entidade);
 
-            contexto.SaveChanges();
+            unityOfWork.Commit();
+        }
+        catch (Exception ex)
+        {
+            unityOfWork.RollBack();
 
-            return RedirectToAction(nameof(Index));
+            logger.LogError(
+                ex,
+                "Ocorreu um erro durante o registro de {@ViewModel}.",
+                cadastrarVM
+            );
         }
 
-        [HttpGet("editar/{id:guid}")]
-        public ActionResult Editar(Guid id)
-        {
-            var registroSelecionado = repositorioMateria.SelecionarRegistroPorId(id);
+        return RedirectToAction(nameof(Index));
+    }
 
-            var editarVM = new EditarMateriaViewModel(
-                    id,
-                    registroSelecionado.Nome,
-                    registroSelecionado.Disciplina,
-                    registroSelecionado.Serie
-                );
+    [HttpGet("editar/{id:guid}")]
+    public ActionResult Editar(Guid id)
+    {
+        var registroSelecionado = repositorioMateria.SelecionarRegistroPorId(id);
+
+        if (registroSelecionado is null)
+            return RedirectToAction(nameof(Index));
+
+        var disciplinas = repositorioDisciplina.SelecionarRegistros();
+
+        var editarVM = new EditarMateriaViewModel(
+            id,
+            registroSelecionado.Nome,
+            registroSelecionado.Serie,
+            registroSelecionado.Disciplina.Id,
+            disciplinas
+        );
+
+        return View(editarVM);
+    }
+
+    [HttpPost("editar/{id:guid}")]
+    [ValidateAntiForgeryToken]
+    public ActionResult Editar(Guid id, EditarMateriaViewModel editarVM)
+    {
+        var registros = repositorioMateria.SelecionarRegistros();
+
+        var disciplinas = repositorioDisciplina.SelecionarRegistros();
+
+        if (registros.Any(i => !i.Id.Equals(editarVM.Id) && i.Nome.Equals(editarVM.Nome)))
+        {
+            ModelState.AddModelError(
+                "CadastroUnico",
+                "Já existe uma disciplina registrada com este nome."
+            );
+
+            editarVM.DisciplinasDisponiveis = disciplinas
+                .Select(d => new SelectListItem(d.Nome, d.Id.ToString()))
+                .ToList();
 
             return View(editarVM);
         }
 
-        [HttpPost("editar/{id:guid}")]
-        [ValidateAntiForgeryToken]
-        public ActionResult Editar(Guid id, EditarMateriaViewModel editarVM)
+        try
         {
-            var registros = repositorioMateria.SelecionarRegistros();
-
-            foreach (var item in registros)
-            {
-                if (!item.Id.Equals(id) && item.Nome.Equals(editarVM.Nome))
-                {
-                    ModelState.AddModelError("CadastroUnico", "Já existe uma matéria com esse nome");
-                    break;
-                }
-            }
-
-            if (!ModelState.IsValid)
-                return View(editarVM);
-
-            var entidadeEditada = editarVM.ParaEntidade();
+            var entidadeEditada = FormularioMateriaViewModel.ParaEntidade(editarVM, disciplinas);
 
             repositorioMateria.EditarRegistro(id, entidadeEditada);
 
-            contexto.SaveChanges();
-
-            return RedirectToAction(nameof(Index));
+            unityOfWork.Commit();
         }
-
-        [HttpGet("excluir/{id:guid}")]
-        public IActionResult Excluir(Guid id)
+        catch (Exception ex)
         {
-            var registroSelecionado = repositorioMateria.SelecionarRegistroPorId(id);
+            unityOfWork.RollBack();
 
-            var excluirVM = new ExcluirMateriaViewModel(registroSelecionado.Id, registroSelecionado.Nome);
-
-            return View(excluirVM);
+            logger.LogError(
+                ex,
+                "Ocorreu um erro durante a edição do registro {@ViewModel}.",
+                editarVM
+            );
         }
 
-        [HttpPost("excluir/{id:guid}")]
-        public IActionResult ExcluirConfirmado(Guid id)
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpGet("excluir/{id:guid}")]
+    public IActionResult Excluir(Guid id)
+    {
+        var registroSelecionado = repositorioMateria.SelecionarRegistroPorId(id);
+
+        if (registroSelecionado is null)
+            return RedirectToAction(nameof(Index));
+
+        var excluirVM = new ExcluirMateriaViewModel(
+            registroSelecionado.Id,
+            registroSelecionado.Nome
+        );
+
+        return View(excluirVM);
+    }
+
+    [HttpPost("excluir/{id:guid}")]
+    [ValidateAntiForgeryToken]
+    public IActionResult ExcluirConfirmado(Guid id)
+    {
+        try
         {
             repositorioMateria.ExcluirRegistro(id);
 
-            contexto.SaveChanges();
-
-            return RedirectToAction(nameof(Index));
+            unityOfWork.Commit();
         }
-
-        [HttpGet("detalhes/{id:guid}")]
-        public IActionResult Detalhes(Guid id)
+        catch (Exception ex)
         {
-            var registroSelecionado = repositorioMateria.SelecionarRegistroPorId(id);
+            unityOfWork.RollBack();
 
-            var detalhesVM = new DetalhesMateriaViewModel(
-                id,
-                registroSelecionado.Nome,
-                registroSelecionado.Disciplina,
-                registroSelecionado.Serie
+            logger.LogError(
+                ex,
+                "Ocorreu um erro durante a exclusão do registro {Id}.",
+                id
             );
-
-            return View(detalhesVM);
         }
+
+        return RedirectToAction(nameof(Index));
+    }
+
+
+    [HttpGet("detalhes/{id:guid}")]
+    public IActionResult Detalhes(Guid id)
+    {
+        var registroSelecionado = repositorioMateria.SelecionarRegistroPorId(id);
+
+        if (registroSelecionado is null)
+            return RedirectToAction(nameof(Index));
+
+        var detalhesVM = new DetalhesMateriaViewModel(
+            id,
+            registroSelecionado.Nome,
+            registroSelecionado.Serie,
+            registroSelecionado.Disciplina.Nome
+        );
+
+        return View(detalhesVM);
     }
 }

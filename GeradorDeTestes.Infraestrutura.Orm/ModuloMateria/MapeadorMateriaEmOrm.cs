@@ -9,8 +9,8 @@ public class MapeadorMateriaEmOrm : IEntityTypeConfiguration<Materia>
     public void Configure(EntityTypeBuilder<Materia> builder)
     {
         builder.Property(m => m.Id)
-            .ValueGeneratedNever()
-            .IsRequired();
+           .ValueGeneratedNever()
+           .IsRequired();
 
         builder.Property(m => m.Nome)
             .HasMaxLength(100)
@@ -19,7 +19,6 @@ public class MapeadorMateriaEmOrm : IEntityTypeConfiguration<Materia>
         builder.Property(m => m.Serie)
             .IsRequired()
             .HasConversion<int>();
-
 
         builder.HasOne(m => m.Disciplina)
             .WithMany(d => d.Materias)
